@@ -225,10 +225,134 @@ extract() {
 }
 
 # ================================
+# Tool Integrations
+# ================================
+
+# --- lazygit ---
+alias lg='lazygit'
+
+# --- yazi (file manager) ---
+# Use 'y' to open yazi and cd to the directory when exiting
+function y() {
+  local tmp="$(mktemp -t "yazi-cwd.XXXXXX")" cwd
+  yazi "$@" --cwd-file="$tmp"
+  if cwd="$(command cat -- "$tmp")" && [ -n "$cwd" ] && [ "$cwd" != "$PWD" ]; then
+    builtin cd -- "$cwd"
+  fi
+  rm -f -- "$tmp"
+}
+
+# --- fzf-git.sh (enhanced git operations) ---
+# Keybindings:
+#   Ctrl+G Ctrl+F - Files
+#   Ctrl+G Ctrl+B - Branches
+#   Ctrl+G Ctrl+T - Tags
+#   Ctrl+G Ctrl+R - Remotes
+#   Ctrl+G Ctrl+H - Hashes (commits)
+#   Ctrl+G Ctrl+S - Stashes
+#   Ctrl+G Ctrl+L - Reflogs
+#   Ctrl+G Ctrl+W - Worktrees
+#   Ctrl+G Ctrl+E - Each ref
+[[ -f ~/.config/fzf-git.sh ]] && source ~/.config/fzf-git.sh
+
+# --- mise (version manager for Node, Python, Go, etc.) ---
+if command -v mise &> /dev/null; then
+  eval "$(mise activate zsh)"
+fi
+
+# --- tldr (simplified man pages) ---
+alias help='tldr'
+
+# ================================
+# Claude CLI Integration
+# ================================
+
+# Claude Code headless mode helpers
+# Usage: ask "your question here"
+ask() {
+  if [[ -z "$1" ]]; then
+    echo "Usage: ask \"your question\""
+    return 1
+  fi
+  claude -p "$*"
+}
+
+# Ask Claude with file context
+# Usage: askf file.py "explain this code"
+askf() {
+  if [[ -z "$1" || -z "$2" ]]; then
+    echo "Usage: askf <file> \"your question\""
+    return 1
+  fi
+  local file="$1"
+  shift
+  cat "$file" | claude -p "$*"
+}
+
+# Ask Claude to generate code
+# Usage: gen "create a python script that..."
+gen() {
+  if [[ -z "$1" ]]; then
+    echo "Usage: gen \"description of what to generate\""
+    return 1
+  fi
+  claude -p "Generate code: $*"
+}
+
+# Ask Claude to explain a command
+# Usage: explain "ls -la"
+explain() {
+  if [[ -z "$1" ]]; then
+    echo "Usage: explain \"command\""
+    return 1
+  fi
+  claude -p "Explain this shell command in detail: $*"
+}
+
+# Ask Claude to fix an error
+# Usage: fix "error message"
+fix() {
+  if [[ -z "$1" ]]; then
+    echo "Usage: fix \"error message\""
+    return 1
+  fi
+  claude -p "How do I fix this error: $*"
+}
+
+# Pipe command output to Claude for analysis
+# Usage: some_command | ask-pipe "analyze this output"
+ask-pipe() {
+  local prompt="${1:-Analyze this output}"
+  claude -p "$prompt"
+}
+
+# Git commit message generator
+# Usage: gcm (generates commit message based on staged changes)
+gcm() {
+  local diff=$(git diff --cached)
+  if [[ -z "$diff" ]]; then
+    echo "No staged changes found. Use 'git add' first."
+    return 1
+  fi
+  echo "$diff" | claude -p "Generate a concise git commit message for these changes. Output only the commit message, nothing else."
+}
+
+# Code review helper
+# Usage: review file.py
+review() {
+  if [[ -z "$1" ]]; then
+    echo "Usage: review <file>"
+    return 1
+  fi
+  cat "$1" | claude -p "Review this code. Point out potential bugs, security issues, and suggest improvements."
+}
+
+# ================================
 # Lazy Loading (for faster startup)
 # ================================
 
 # NVM lazy loading (saves ~300ms startup time)
+# Note: If using mise, you can remove nvm entirely
 export NVM_DIR="$HOME/.nvm"
 if [[ -d "$NVM_DIR" ]]; then
   nvm() {

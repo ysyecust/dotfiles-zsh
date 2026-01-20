@@ -85,6 +85,10 @@ install_packages() {
         "fd"          # Modern find
         "ripgrep"     # Modern grep
         "fzf"         # Fuzzy finder
+        "lazygit"     # Terminal Git UI
+        "yazi"        # Terminal file manager
+        "tmux"        # Terminal multiplexer
+        "mise"        # Version manager (Node, Python, Go, etc.)
     )
 
     for pkg in "${packages[@]}"; do
@@ -137,6 +141,16 @@ install_configs() {
     cp "${SCRIPT_DIR}/config/.zshrc" "${HOME}/.zshrc"
     print_success "Installed .zshrc"
 
+    # Backup and install .tmux.conf
+    backup_config "${HOME}/.tmux.conf"
+    cp "${SCRIPT_DIR}/config/.tmux.conf" "${HOME}/.tmux.conf"
+    print_success "Installed .tmux.conf"
+
+    # Install fzf-git.sh
+    mkdir -p "${HOME}/.config"
+    cp "${SCRIPT_DIR}/config/fzf-git.sh" "${HOME}/.config/fzf-git.sh"
+    print_success "Installed fzf-git.sh"
+
     # Install .p10k.zsh if not exists or user wants to overwrite
     if [[ -f "${HOME}/.p10k.zsh" ]]; then
         print_warning ".p10k.zsh already exists. Run 'p10k configure' to reconfigure."
@@ -167,25 +181,34 @@ print_summary() {
     echo "Installed components:"
     echo "  • Zim framework with optimized modules"
     echo "  • Powerlevel10k theme"
-    echo "  • fzf + fzf-tab (fuzzy finder)"
+    echo "  • fzf + fzf-tab + fzf-git (fuzzy finder)"
     echo "  • zoxide (smart cd)"
     echo "  • eza (modern ls)"
     echo "  • bat (modern cat)"
     echo "  • fd (modern find)"
     echo "  • ripgrep (modern grep)"
+    echo "  • lazygit (terminal Git UI)"
+    echo "  • yazi (terminal file manager)"
+    echo "  • tmux (terminal multiplexer)"
+    echo "  • mise (version manager)"
     echo ""
     echo "Next steps:"
     echo "  1. Restart your terminal or run: source ~/.zshrc"
     echo "  2. If p10k prompt appears, configure your theme"
     echo "  3. Use 'z' command a few times to let zoxide learn your directories"
+    echo "  4. Install Claude CLI for AI features: npm install -g @anthropic-ai/claude-code"
     echo ""
     echo "Quick reference:"
-    echo "  Ctrl+T    - Fuzzy file search"
-    echo "  Ctrl+R    - Fuzzy history search"
-    echo "  Alt+C     - Fuzzy directory jump"
-    echo "  z <dir>   - Smart directory jump"
-    echo "  ll        - Enhanced ls"
-    echo "  cat       - Syntax highlighted cat"
+    echo "  Ctrl+T      - Fuzzy file search"
+    echo "  Ctrl+R      - Fuzzy history search"
+    echo "  Alt+C       - Fuzzy directory jump"
+    echo "  Ctrl+G      - fzf-git commands (branches, commits, etc.)"
+    echo "  z <dir>     - Smart directory jump"
+    echo "  lg          - Lazygit"
+    echo "  y           - Yazi file manager"
+    echo "  tmux        - Terminal multiplexer"
+    echo "  ask \"...\"   - Ask Claude (headless mode)"
+    echo "  gcm         - Generate git commit message with Claude"
     echo ""
 }
 
