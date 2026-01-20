@@ -1,0 +1,8 @@
+# macOS
+.DS_Store
+
+# Backup files
+*.backup.*
+
+# Local config
+.zshrc.local
