@@ -32,7 +32,7 @@
 
 ```bash
 # 克隆仓库
-git clone https://github.com/shaoyiyang/dotfiles-zsh.git ~/dotfiles-zsh
+git clone https://github.com/ysyecust/dotfiles-zsh.git ~/dotfiles-zsh
 
 # 运行安装脚本
 cd ~/dotfiles-zsh
