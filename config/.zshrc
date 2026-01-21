@@ -528,7 +528,86 @@ fi
 # ================================
 # Terminal Startup Display
 # ================================
-# Show system info on terminal startup (only for interactive shells)
-if [[ $- == *i* ]] && command -v fastfetch &> /dev/null; then
-  fastfetch --logo small
+
+# Tips array for daily tips
+TIPS=(
+  "💡 Ctrl+T     搜索文件 | Ctrl+R 搜索历史 | Alt+C 跳转目录"
+  "💡 z <dir>    智能跳转 | zi 交互选择 | zoxide 会学习你的习惯"
+  "💡 lg         打开 lazygit | y 打开 yazi 文件管理器"
+  "💡 ll         详细列表 | lt 树形显示 | la 显示隐藏文件"
+  "💡 Ctrl+G Ctrl+B 搜索 Git 分支 | Ctrl+G Ctrl+H 搜索提交历史"
+  "💡 bm add <名称> 添加书签 | bm 选择书签跳转 | bm list 列出书签"
+  "💡 fssh       fzf 选择 SSH 连接 | dsh 进入 Docker 容器"
+  "💡 ask \"问题\"  问 Claude | gcm 生成 commit 信息 | review 代码审查"
+  "💡 notify <命令> 长命令完成后通知 | serve 8080 快速 HTTP 服务器"
+  "💡 fe 搜索并编辑文件 | fcd 搜索并进入目录 | fbr 切换 Git 分支"
+  "💡 d/dc Docker 快捷 | k Kubectl 快捷 | dps 查看容器状态"
+  "💡 cat 带语法高亮 | .. 返回上级 | mkcd 创建并进入目录"
+  "💡 tmux: Ctrl+B | 垂直分割 | Ctrl+B - 水平分割 | Ctrl+B g lazygit"
+  "💡 tips       显示完整快捷键列表 | reload 重新加载配置"
+)
+
+# Show tips command - display full cheatsheet
+tips() {
+  echo ""
+  echo "╔══════════════════════════════════════════════════════════════════╗"
+  echo "║                    🚀 Terminal Cheatsheet                        ║"
+  echo "╚══════════════════════════════════════════════════════════════════╝"
+  echo ""
+  echo "📁 文件浏览"
+  echo "   ls/ll/la      eza 增强列表        lt/lta    树形显示"
+  echo "   cat/catn      bat 语法高亮        y         yazi 文件管理器"
+  echo ""
+  echo "🔍 模糊搜索 (fzf)"
+  echo "   Ctrl+T        搜索文件            Ctrl+R    搜索历史"
+  echo "   Alt+C         跳转目录            Tab       fzf 补全"
+  echo "   fe            搜索并编辑          fcd       搜索并进入目录"
+  echo ""
+  echo "🌿 Git"
+  echo "   lg            lazygit             gs        git status"
+  echo "   Ctrl+G Ctrl+B 搜索分支            Ctrl+G Ctrl+H 搜索提交"
+  echo "   fbr           切换分支            gcm       AI 生成 commit"
+  echo ""
+  echo "📍 导航"
+  echo "   z <dir>       智能跳转            zi        交互选择"
+  echo "   bm            书签跳转            bm add    添加书签"
+  echo "   ../...        返回上级            mkcd      创建并进入"
+  echo ""
+  echo "🐳 Docker / ☸️  K8s"
+  echo "   d/dc          docker/compose      k         kubectl"
+  echo "   dps           容器状态            kgp       get pods"
+  echo "   dsh           进入容器            ksh       进入 pod"
+  echo ""
+  echo "🤖 Claude AI"
+  echo "   ask \"问题\"    直接提问            askf      带文件提问"
+  echo "   explain       解释命令            fix       修复错误"
+  echo "   gcm           生成 commit         review    代码审查"
+  echo ""
+  echo "🛠 工具"
+  echo "   fssh          SSH 连接            serve     HTTP 服务器"
+  echo "   notify        命令完成通知        extract   解压文件"
+  echo "   myip          公网 IP             ports     监听端口"
+  echo ""
+  echo "⌨️  Tmux (前缀: Ctrl+B)"
+  echo "   |             垂直分割            -         水平分割"
+  echo "   h/j/k/l       窗格导航            g         lazygit"
+  echo "   c             新建窗口            x         关闭窗格"
+  echo ""
+  echo "💾 配置管理"
+  echo "   reload        重载 zshrc          tips      显示此帮助"
+  echo "   ~/dotfiles-zsh/update.sh          更新工具和配置"
+  echo ""
+}
+
+# Show system info and daily tip on terminal startup
+if [[ $- == *i* ]]; then
+  # Show fastfetch if available
+  if command -v fastfetch &> /dev/null; then
+    fastfetch --logo small
+  fi
+  # Show random tip
+  echo ""
+  echo "${TIPS[$RANDOM % ${#TIPS[@]} + 1]}"
+  echo "    输入 tips 查看完整快捷键列表"
+  echo ""
 fi
