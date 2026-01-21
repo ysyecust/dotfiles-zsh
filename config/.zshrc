@@ -175,6 +175,30 @@ alias reload='source ~/.zshrc'
 alias path='echo $PATH | tr ":" "\n"'
 alias ports='lsof -i -P -n | grep LISTEN'
 alias cls='clear'
+alias week='date +%V'  # Current week number
+alias myip='curl -s ifconfig.me'  # Public IP
+
+# --- Docker shortcuts ---
+alias d='docker'
+alias dc='docker compose'
+alias dps='docker ps --format "table {{.ID}}\t{{.Names}}\t{{.Status}}\t{{.Ports}}"'
+alias dpsa='docker ps -a --format "table {{.ID}}\t{{.Names}}\t{{.Status}}"'
+alias dim='docker images'
+alias dex='docker exec -it'
+alias dlogs='docker logs -f'
+alias dprune='docker system prune -af'
+
+# --- Kubernetes shortcuts ---
+alias k='kubectl'
+alias kgp='kubectl get pods'
+alias kgs='kubectl get svc'
+alias kgd='kubectl get deployments'
+alias kga='kubectl get all'
+alias kd='kubectl describe'
+alias kl='kubectl logs -f'
+alias kex='kubectl exec -it'
+alias kctx='kubectl config use-context'
+alias kns='kubectl config set-context --current --namespace'
 
 # ================================
 # Functions
@@ -232,6 +256,112 @@ extract() {
   else
     echo "'$1' is not a valid file"
   fi
+}
+
+# SSH connection with fzf
+# Parses ~/.ssh/config for hosts
+fssh() {
+  local host
+  host=$(grep -E "^Host\s+" ~/.ssh/config 2>/dev/null | grep -v "\*" | awk '{print $2}' | fzf --prompt="SSH> " --preview 'grep -A 5 "^Host {}" ~/.ssh/config')
+  [[ -n "$host" ]] && ssh "$host"
+}
+
+# Project bookmarks - quick jump to favorite directories
+# Add bookmarks: bm add <name>
+# Jump to bookmark: bm <name>
+# List bookmarks: bm list
+# Remove bookmark: bm rm <name>
+BOOKMARKS_FILE="$HOME/.bookmarks"
+bm() {
+  case "$1" in
+    add)
+      if [[ -z "$2" ]]; then
+        echo "Usage: bm add <name>"
+        return 1
+      fi
+      echo "$2|$PWD" >> "$BOOKMARKS_FILE"
+      echo "Bookmark '$2' added for $PWD"
+      ;;
+    rm)
+      if [[ -z "$2" ]]; then
+        echo "Usage: bm rm <name>"
+        return 1
+      fi
+      if [[ -f "$BOOKMARKS_FILE" ]]; then
+        sed -i '' "/^$2|/d" "$BOOKMARKS_FILE"
+        echo "Bookmark '$2' removed"
+      fi
+      ;;
+    list)
+      if [[ -f "$BOOKMARKS_FILE" ]]; then
+        cat "$BOOKMARKS_FILE" | column -t -s '|'
+      else
+        echo "No bookmarks found"
+      fi
+      ;;
+    "")
+      # Interactive selection with fzf
+      if [[ -f "$BOOKMARKS_FILE" ]]; then
+        local selected
+        selected=$(cat "$BOOKMARKS_FILE" | fzf --prompt="Bookmark> " -d '|' --preview 'eza --tree --level=1 --color=always {2}' | cut -d'|' -f2)
+        [[ -n "$selected" ]] && cd "$selected"
+      else
+        echo "No bookmarks found. Use 'bm add <name>' to add one."
+      fi
+      ;;
+    *)
+      # Direct jump by name
+      if [[ -f "$BOOKMARKS_FILE" ]]; then
+        local dir
+        dir=$(grep "^$1|" "$BOOKMARKS_FILE" | cut -d'|' -f2)
+        if [[ -n "$dir" ]]; then
+          cd "$dir"
+        else
+          echo "Bookmark '$1' not found"
+        fi
+      fi
+      ;;
+  esac
+}
+
+# Long command notification (for commands > 10 seconds)
+# Usage: notify <command>
+# Or: <command> && notify-done
+notify() {
+  local start_time=$(date +%s)
+  eval "$@"
+  local exit_code=$?
+  local end_time=$(date +%s)
+  local duration=$((end_time - start_time))
+  if [[ $duration -gt 10 ]]; then
+    osascript -e "display notification \"Command finished in ${duration}s\" with title \"Terminal\" sound name \"Glass\""
+  fi
+  return $exit_code
+}
+
+notify-done() {
+  osascript -e "display notification \"Command completed\" with title \"Terminal\" sound name \"Glass\""
+}
+
+# Quick HTTP server in current directory
+serve() {
+  local port="${1:-8000}"
+  echo "Serving on http://localhost:$port"
+  python3 -m http.server "$port"
+}
+
+# Docker container shell
+dsh() {
+  local container
+  container=$(docker ps --format "{{.Names}}" | fzf --prompt="Container> ")
+  [[ -n "$container" ]] && docker exec -it "$container" sh -c "bash || sh"
+}
+
+# Kubernetes pod shell
+ksh() {
+  local pod
+  pod=$(kubectl get pods --no-headers -o custom-columns=":metadata.name" | fzf --prompt="Pod> ")
+  [[ -n "$pod" ]] && kubectl exec -it "$pod" -- sh -c "bash || sh"
 }
 
 # ================================
