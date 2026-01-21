@@ -89,6 +89,9 @@ if [[ -f "/opt/homebrew/bin/brew" ]]; then
   eval "$(/opt/homebrew/bin/brew shellenv)"
 fi
 
+# Local bin (for Claude CLI, etc.)
+export PATH="$HOME/.local/bin:$PATH"
+
 # Default editor
 export EDITOR='nvim'
 export VISUAL='nvim'
@@ -107,7 +110,7 @@ export FZF_DEFAULT_COMMAND='fd --type f --hidden --follow --exclude .git'
 export FZF_CTRL_T_COMMAND="$FZF_DEFAULT_COMMAND"
 export FZF_ALT_C_COMMAND='fd --type d --hidden --follow --exclude .git'
 
-# fzf appearance and preview
+# fzf appearance and preview (Catppuccin Mocha theme)
 export FZF_DEFAULT_OPTS="
   --height 60%
   --layout=reverse
@@ -115,6 +118,13 @@ export FZF_DEFAULT_OPTS="
   --preview-window=right:50%:wrap
   --bind 'ctrl-/:toggle-preview'
   --bind 'ctrl-y:execute-silent(echo -n {} | pbcopy)'
+  --color=bg+:#313244,bg:#1e1e2e,spinner:#f5e0dc,hl:#f38ba8
+  --color=fg:#cdd6f4,header:#f38ba8,info:#cba6f7,pointer:#f5e0dc
+  --color=marker:#f5e0dc,fg+:#cdd6f4,prompt:#cba6f7,hl+:#f38ba8
+  --color=border:#6c7086
+  --prompt='  '
+  --pointer='▶'
+  --marker='✓'
 "
 
 # File preview with bat
@@ -165,6 +175,30 @@ alias reload='source ~/.zshrc'
 alias path='echo $PATH | tr ":" "\n"'
 alias ports='lsof -i -P -n | grep LISTEN'
 alias cls='clear'
+alias week='date +%V'  # Current week number
+alias myip='curl -s ifconfig.me'  # Public IP
+
+# --- Docker shortcuts ---
+alias d='docker'
+alias dc='docker compose'
+alias dps='docker ps --format "table {{.ID}}\t{{.Names}}\t{{.Status}}\t{{.Ports}}"'
+alias dpsa='docker ps -a --format "table {{.ID}}\t{{.Names}}\t{{.Status}}"'
+alias dim='docker images'
+alias dex='docker exec -it'
+alias dlogs='docker logs -f'
+alias dprune='docker system prune -af'
+
+# --- Kubernetes shortcuts ---
+alias k='kubectl'
+alias kgp='kubectl get pods'
+alias kgs='kubectl get svc'
+alias kgd='kubectl get deployments'
+alias kga='kubectl get all'
+alias kd='kubectl describe'
+alias kl='kubectl logs -f'
+alias kex='kubectl exec -it'
+alias kctx='kubectl config use-context'
+alias kns='kubectl config set-context --current --namespace'
 
 # ================================
 # Functions
@@ -224,11 +258,241 @@ extract() {
   fi
 }
 
+# SSH connection with fzf
+# Parses ~/.ssh/config for hosts
+fssh() {
+  local host
+  host=$(grep -E "^Host\s+" ~/.ssh/config 2>/dev/null | grep -v "\*" | awk '{print $2}' | fzf --prompt="SSH> " --preview 'grep -A 5 "^Host {}" ~/.ssh/config')
+  [[ -n "$host" ]] && ssh "$host"
+}
+
+# Project bookmarks - quick jump to favorite directories
+# Add bookmarks: bm add <name>
+# Jump to bookmark: bm <name>
+# List bookmarks: bm list
+# Remove bookmark: bm rm <name>
+BOOKMARKS_FILE="$HOME/.bookmarks"
+bm() {
+  case "$1" in
+    add)
+      if [[ -z "$2" ]]; then
+        echo "Usage: bm add <name>"
+        return 1
+      fi
+      echo "$2|$PWD" >> "$BOOKMARKS_FILE"
+      echo "Bookmark '$2' added for $PWD"
+      ;;
+    rm)
+      if [[ -z "$2" ]]; then
+        echo "Usage: bm rm <name>"
+        return 1
+      fi
+      if [[ -f "$BOOKMARKS_FILE" ]]; then
+        sed -i '' "/^$2|/d" "$BOOKMARKS_FILE"
+        echo "Bookmark '$2' removed"
+      fi
+      ;;
+    list)
+      if [[ -f "$BOOKMARKS_FILE" ]]; then
+        cat "$BOOKMARKS_FILE" | column -t -s '|'
+      else
+        echo "No bookmarks found"
+      fi
+      ;;
+    "")
+      # Interactive selection with fzf
+      if [[ -f "$BOOKMARKS_FILE" ]]; then
+        local selected
+        selected=$(cat "$BOOKMARKS_FILE" | fzf --prompt="Bookmark> " -d '|' --preview 'eza --tree --level=1 --color=always {2}' | cut -d'|' -f2)
+        [[ -n "$selected" ]] && cd "$selected"
+      else
+        echo "No bookmarks found. Use 'bm add <name>' to add one."
+      fi
+      ;;
+    *)
+      # Direct jump by name
+      if [[ -f "$BOOKMARKS_FILE" ]]; then
+        local dir
+        dir=$(grep "^$1|" "$BOOKMARKS_FILE" | cut -d'|' -f2)
+        if [[ -n "$dir" ]]; then
+          cd "$dir"
+        else
+          echo "Bookmark '$1' not found"
+        fi
+      fi
+      ;;
+  esac
+}
+
+# Long command notification (for commands > 10 seconds)
+# Usage: notify <command>
+# Or: <command> && notify-done
+notify() {
+  local start_time=$(date +%s)
+  eval "$@"
+  local exit_code=$?
+  local end_time=$(date +%s)
+  local duration=$((end_time - start_time))
+  if [[ $duration -gt 10 ]]; then
+    osascript -e "display notification \"Command finished in ${duration}s\" with title \"Terminal\" sound name \"Glass\""
+  fi
+  return $exit_code
+}
+
+notify-done() {
+  osascript -e "display notification \"Command completed\" with title \"Terminal\" sound name \"Glass\""
+}
+
+# Quick HTTP server in current directory
+serve() {
+  local port="${1:-8000}"
+  echo "Serving on http://localhost:$port"
+  python3 -m http.server "$port"
+}
+
+# Docker container shell
+dsh() {
+  local container
+  container=$(docker ps --format "{{.Names}}" | fzf --prompt="Container> ")
+  [[ -n "$container" ]] && docker exec -it "$container" sh -c "bash || sh"
+}
+
+# Kubernetes pod shell
+ksh() {
+  local pod
+  pod=$(kubectl get pods --no-headers -o custom-columns=":metadata.name" | fzf --prompt="Pod> ")
+  [[ -n "$pod" ]] && kubectl exec -it "$pod" -- sh -c "bash || sh"
+}
+
+# ================================
+# Tool Integrations
+# ================================
+
+# --- lazygit ---
+alias lg='lazygit'
+
+# --- yazi (file manager) ---
+# Use 'y' to open yazi and cd to the directory when exiting
+function y() {
+  local tmp="$(mktemp -t "yazi-cwd.XXXXXX")" cwd
+  yazi "$@" --cwd-file="$tmp"
+  if cwd="$(command cat -- "$tmp")" && [ -n "$cwd" ] && [ "$cwd" != "$PWD" ]; then
+    builtin cd -- "$cwd"
+  fi
+  rm -f -- "$tmp"
+}
+
+# --- fzf-git.sh (enhanced git operations) ---
+# Keybindings:
+#   Ctrl+G Ctrl+F - Files
+#   Ctrl+G Ctrl+B - Branches
+#   Ctrl+G Ctrl+T - Tags
+#   Ctrl+G Ctrl+R - Remotes
+#   Ctrl+G Ctrl+H - Hashes (commits)
+#   Ctrl+G Ctrl+S - Stashes
+#   Ctrl+G Ctrl+L - Reflogs
+#   Ctrl+G Ctrl+W - Worktrees
+#   Ctrl+G Ctrl+E - Each ref
+[[ -f ~/.config/fzf-git.sh ]] && source ~/.config/fzf-git.sh
+
+# --- mise (version manager for Node, Python, Go, etc.) ---
+if command -v mise &> /dev/null; then
+  eval "$(mise activate zsh)"
+fi
+
+# --- tldr (simplified man pages) ---
+alias help='tldr'
+
+# ================================
+# Claude CLI Integration
+# ================================
+
+# Claude Code headless mode helpers
+# Usage: ask "your question here"
+ask() {
+  if [[ -z "$1" ]]; then
+    echo "Usage: ask \"your question\""
+    return 1
+  fi
+  claude -p "$*"
+}
+
+# Ask Claude with file context
+# Usage: askf file.py "explain this code"
+askf() {
+  if [[ -z "$1" || -z "$2" ]]; then
+    echo "Usage: askf <file> \"your question\""
+    return 1
+  fi
+  local file="$1"
+  shift
+  cat "$file" | claude -p "$*"
+}
+
+# Ask Claude to generate code
+# Usage: gen "create a python script that..."
+gen() {
+  if [[ -z "$1" ]]; then
+    echo "Usage: gen \"description of what to generate\""
+    return 1
+  fi
+  claude -p "Generate code: $*"
+}
+
+# Ask Claude to explain a command
+# Usage: explain "ls -la"
+explain() {
+  if [[ -z "$1" ]]; then
+    echo "Usage: explain \"command\""
+    return 1
+  fi
+  claude -p "Explain this shell command in detail: $*"
+}
+
+# Ask Claude to fix an error
+# Usage: fix "error message"
+fix() {
+  if [[ -z "$1" ]]; then
+    echo "Usage: fix \"error message\""
+    return 1
+  fi
+  claude -p "How do I fix this error: $*"
+}
+
+# Pipe command output to Claude for analysis
+# Usage: some_command | ask-pipe "analyze this output"
+ask-pipe() {
+  local prompt="${1:-Analyze this output}"
+  claude -p "$prompt"
+}
+
+# Git commit message generator
+# Usage: gcm (generates commit message based on staged changes)
+gcm() {
+  local diff=$(git diff --cached)
+  if [[ -z "$diff" ]]; then
+    echo "No staged changes found. Use 'git add' first."
+    return 1
+  fi
+  echo "$diff" | claude -p "Generate a concise git commit message for these changes. Output only the commit message, nothing else."
+}
+
+# Code review helper
+# Usage: review file.py
+review() {
+  if [[ -z "$1" ]]; then
+    echo "Usage: review <file>"
+    return 1
+  fi
+  cat "$1" | claude -p "Review this code. Point out potential bugs, security issues, and suggest improvements."
+}
+
 # ================================
 # Lazy Loading (for faster startup)
 # ================================
 
 # NVM lazy loading (saves ~300ms startup time)
+# Note: If using mise, you can remove nvm entirely
 export NVM_DIR="$HOME/.nvm"
 if [[ -d "$NVM_DIR" ]]; then
   nvm() {
@@ -260,3 +524,11 @@ fi
 # ================================
 # Source local config if exists (for machine-specific settings)
 [[ -f ~/.zshrc.local ]] && source ~/.zshrc.local
+
+# ================================
+# Terminal Startup Display
+# ================================
+# Show system info on terminal startup (only for interactive shells)
+if [[ $- == *i* ]] && command -v fastfetch &> /dev/null; then
+  fastfetch --logo small
+fi

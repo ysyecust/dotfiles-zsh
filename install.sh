@@ -49,53 +49,104 @@ backup_config() {
     fi
 }
 
-# Check if running on macOS
-check_os() {
-    if [[ "$(uname)" != "Darwin" ]]; then
-        print_error "This script is designed for macOS. For Linux, please modify the package manager commands."
-        exit 1
+# Detect OS
+OS="$(uname)"
+LINUX_DISTRO=""
+if [[ "$OS" == "Linux" ]]; then
+    if [[ -f /etc/os-release ]]; then
+        LINUX_DISTRO=$(grep ^ID= /etc/os-release | cut -d= -f2 | tr -d '"')
     fi
-}
+fi
 
-# Install Homebrew if not installed
-install_homebrew() {
-    print_step "Checking Homebrew..."
-    if ! command -v brew &> /dev/null; then
-        print_step "Installing Homebrew..."
-        /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-
-        # Add Homebrew to PATH for Apple Silicon
-        if [[ -f "/opt/homebrew/bin/brew" ]]; then
-            eval "$(/opt/homebrew/bin/brew shellenv)"
-        fi
-        print_success "Homebrew installed"
-    else
-        print_success "Homebrew already installed"
-    fi
-}
-
-# Install required packages
+# Install package manager and packages based on OS
 install_packages() {
     print_step "Installing packages..."
 
     local packages=(
-        "zoxide"      # Smart cd
-        "eza"         # Modern ls
-        "bat"         # Modern cat
-        "fd"          # Modern find
-        "ripgrep"     # Modern grep
-        "fzf"         # Fuzzy finder
+        "zoxide"
+        "eza"
+        "bat"
+        "fd"
+        "ripgrep"
+        "fzf"
+        "lazygit"
+        "yazi"
+        "tmux"
+        "mise"
+        "fastfetch"
     )
 
-    for pkg in "${packages[@]}"; do
-        if brew list "$pkg" &>/dev/null; then
-            print_success "$pkg already installed"
-        else
-            print_step "Installing $pkg..."
-            brew install "$pkg"
-            print_success "$pkg installed"
+    if [[ "$OS" == "Darwin" ]]; then
+        # macOS - use Homebrew
+        if ! command -v brew &> /dev/null; then
+            print_step "Installing Homebrew..."
+            /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+            if [[ -f "/opt/homebrew/bin/brew" ]]; then
+                eval "$(/opt/homebrew/bin/brew shellenv)"
+            fi
         fi
-    done
+        for pkg in "${packages[@]}"; do
+            if ! brew list "$pkg" &>/dev/null; then
+                print_step "Installing $pkg..."
+                brew install "$pkg"
+            fi
+            print_success "$pkg installed"
+        done
+
+    elif [[ "$OS" == "Linux" ]]; then
+        # Linux - detect package manager
+        if command -v apt &> /dev/null; then
+            # Debian/Ubuntu
+            print_step "Using apt package manager..."
+            sudo apt update
+            sudo apt install -y zsh tmux fzf ripgrep bat fd-find
+            # Some packages need special installation
+            # zoxide
+            curl -sSfL https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh | sh
+            # eza
+            sudo apt install -y gpg
+            sudo mkdir -p /etc/apt/keyrings
+            wget -qO- https://raw.githubusercontent.com/eza-community/eza/main/deb.asc | sudo gpg --dearmor -o /etc/apt/keyrings/gierens.gpg
+            echo "deb [signed-by=/etc/apt/keyrings/gierens.gpg] http://deb.gierens.de stable main" | sudo tee /etc/apt/sources.list.d/gierens.list
+            sudo apt update && sudo apt install -y eza
+            # lazygit
+            LAZYGIT_VERSION=$(curl -s "https://api.github.com/repos/jesseduffield/lazygit/releases/latest" | grep -Po '"tag_name": "v\K[^"]*')
+            curl -Lo lazygit.tar.gz "https://github.com/jesseduffield/lazygit/releases/latest/download/lazygit_${LAZYGIT_VERSION}_Linux_x86_64.tar.gz"
+            tar xf lazygit.tar.gz lazygit && sudo install lazygit /usr/local/bin && rm lazygit lazygit.tar.gz
+            # yazi
+            curl -sSfL https://raw.githubusercontent.com/sxyazi/yazi/main/scripts/install.sh | sh
+            # mise
+            curl https://mise.run | sh
+            # fastfetch
+            sudo apt install -y fastfetch 2>/dev/null || print_warning "fastfetch not available, skipping"
+            # Create symlinks for different names
+            [[ ! -f /usr/bin/fd ]] && sudo ln -sf /usr/bin/fdfind /usr/bin/fd 2>/dev/null || true
+            [[ ! -f /usr/bin/bat ]] && sudo ln -sf /usr/bin/batcat /usr/bin/bat 2>/dev/null || true
+
+        elif command -v dnf &> /dev/null; then
+            # Fedora/RHEL
+            print_step "Using dnf package manager..."
+            sudo dnf install -y zsh tmux fzf ripgrep bat fd-find eza
+            curl -sSfL https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh | sh
+            # lazygit
+            sudo dnf copr enable atim/lazygit -y && sudo dnf install -y lazygit
+            # mise
+            curl https://mise.run | sh
+
+        elif command -v pacman &> /dev/null; then
+            # Arch Linux
+            print_step "Using pacman package manager..."
+            sudo pacman -Syu --noconfirm zsh tmux fzf ripgrep bat fd eza zoxide lazygit yazi mise fastfetch
+
+        else
+            print_error "Unsupported Linux distribution. Please install packages manually."
+            exit 1
+        fi
+        print_success "Linux packages installed"
+    else
+        print_error "Unsupported OS: $OS"
+        exit 1
+    fi
 }
 
 # Install Zim framework
@@ -137,6 +188,16 @@ install_configs() {
     cp "${SCRIPT_DIR}/config/.zshrc" "${HOME}/.zshrc"
     print_success "Installed .zshrc"
 
+    # Backup and install .tmux.conf
+    backup_config "${HOME}/.tmux.conf"
+    cp "${SCRIPT_DIR}/config/.tmux.conf" "${HOME}/.tmux.conf"
+    print_success "Installed .tmux.conf"
+
+    # Install fzf-git.sh
+    mkdir -p "${HOME}/.config"
+    cp "${SCRIPT_DIR}/config/fzf-git.sh" "${HOME}/.config/fzf-git.sh"
+    print_success "Installed fzf-git.sh"
+
     # Install .p10k.zsh if not exists or user wants to overwrite
     if [[ -f "${HOME}/.p10k.zsh" ]]; then
         print_warning ".p10k.zsh already exists. Run 'p10k configure' to reconfigure."
@@ -167,25 +228,34 @@ print_summary() {
     echo "Installed components:"
     echo "  • Zim framework with optimized modules"
     echo "  • Powerlevel10k theme"
-    echo "  • fzf + fzf-tab (fuzzy finder)"
+    echo "  • fzf + fzf-tab + fzf-git (fuzzy finder)"
     echo "  • zoxide (smart cd)"
     echo "  • eza (modern ls)"
     echo "  • bat (modern cat)"
     echo "  • fd (modern find)"
     echo "  • ripgrep (modern grep)"
+    echo "  • lazygit (terminal Git UI)"
+    echo "  • yazi (terminal file manager)"
+    echo "  • tmux (terminal multiplexer)"
+    echo "  • mise (version manager)"
     echo ""
     echo "Next steps:"
     echo "  1. Restart your terminal or run: source ~/.zshrc"
     echo "  2. If p10k prompt appears, configure your theme"
     echo "  3. Use 'z' command a few times to let zoxide learn your directories"
+    echo "  4. Install Claude CLI for AI features: npm install -g @anthropic-ai/claude-code"
     echo ""
     echo "Quick reference:"
-    echo "  Ctrl+T    - Fuzzy file search"
-    echo "  Ctrl+R    - Fuzzy history search"
-    echo "  Alt+C     - Fuzzy directory jump"
-    echo "  z <dir>   - Smart directory jump"
-    echo "  ll        - Enhanced ls"
-    echo "  cat       - Syntax highlighted cat"
+    echo "  Ctrl+T      - Fuzzy file search"
+    echo "  Ctrl+R      - Fuzzy history search"
+    echo "  Alt+C       - Fuzzy directory jump"
+    echo "  Ctrl+G      - fzf-git commands (branches, commits, etc.)"
+    echo "  z <dir>     - Smart directory jump"
+    echo "  lg          - Lazygit"
+    echo "  y           - Yazi file manager"
+    echo "  tmux        - Terminal multiplexer"
+    echo "  ask \"...\"   - Ask Claude (headless mode)"
+    echo "  gcm         - Generate git commit message with Claude"
     echo ""
 }
 
@@ -194,11 +264,10 @@ main() {
     echo ""
     echo -e "${BLUE}╔════════════════════════════════════════════════════════════╗${NC}"
     echo -e "${BLUE}║      Zsh Terminal Enhancement Setup                        ║${NC}"
+    echo -e "${BLUE}║      OS: $OS ${LINUX_DISTRO:+($LINUX_DISTRO)}${NC}"
     echo -e "${BLUE}╚════════════════════════════════════════════════════════════╝${NC}"
     echo ""
 
-    check_os
-    install_homebrew
     install_packages
     install_zim
     install_p10k
