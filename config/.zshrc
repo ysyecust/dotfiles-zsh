@@ -110,7 +110,7 @@ export FZF_DEFAULT_COMMAND='fd --type f --hidden --follow --exclude .git'
 export FZF_CTRL_T_COMMAND="$FZF_DEFAULT_COMMAND"
 export FZF_ALT_C_COMMAND='fd --type d --hidden --follow --exclude .git'
 
-# fzf appearance and preview
+# fzf appearance and preview (Catppuccin Mocha theme)
 export FZF_DEFAULT_OPTS="
   --height 60%
   --layout=reverse
@@ -118,6 +118,13 @@ export FZF_DEFAULT_OPTS="
   --preview-window=right:50%:wrap
   --bind 'ctrl-/:toggle-preview'
   --bind 'ctrl-y:execute-silent(echo -n {} | pbcopy)'
+  --color=bg+:#313244,bg:#1e1e2e,spinner:#f5e0dc,hl:#f38ba8
+  --color=fg:#cdd6f4,header:#f38ba8,info:#cba6f7,pointer:#f5e0dc
+  --color=marker:#f5e0dc,fg+:#cdd6f4,prompt:#cba6f7,hl+:#f38ba8
+  --color=border:#6c7086
+  --prompt='  '
+  --pointer='▶'
+  --marker='✓'
 "
 
 # File preview with bat
@@ -387,3 +394,11 @@ fi
 # ================================
 # Source local config if exists (for machine-specific settings)
 [[ -f ~/.zshrc.local ]] && source ~/.zshrc.local
+
+# ================================
+# Terminal Startup Display
+# ================================
+# Show system info on terminal startup (only for interactive shells)
+if [[ $- == *i* ]] && command -v fastfetch &> /dev/null; then
+  fastfetch --logo small
+fi

@@ -89,6 +89,7 @@ install_packages() {
         "yazi"        # Terminal file manager
         "tmux"        # Terminal multiplexer
         "mise"        # Version manager (Node, Python, Go, etc.)
+        "fastfetch"   # System info display
     )
 
     for pkg in "${packages[@]}"; do
