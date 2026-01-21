@@ -550,7 +550,8 @@ TIPS=(
 
 # Show tips command - display full cheatsheet
 tips() {
-  cat << 'EOF'
+  # Disable pager for direct output
+  PAGER=cat cat << 'EOF'
 
 ╔═══════════════════════════════════════════════════════════════════════════════╗
 ║                           🚀 Terminal Cheatsheet                              ║
