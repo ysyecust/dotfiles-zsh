@@ -3,6 +3,24 @@
 # ║                    https://github.com/ysyecust/dotfiles-zsh               ║
 # ╚════════════════════════════════════════════════════════════════════════════╝
 
+# Deduplicate PATH and fpath entries automatically
+typeset -U path fpath
+
+# ================================
+# Early PATH & Homebrew Setup
+# ================================
+# Fast static setup for Apple Silicon Homebrew (avoids ~30ms `brew shellenv` fork)
+# Placed before Instant Prompt & Zim so Homebrew completions and tools are in fpath/PATH
+if [[ -d "/opt/homebrew" ]]; then
+  export HOMEBREW_PREFIX="/opt/homebrew"
+  export HOMEBREW_CELLAR="/opt/homebrew/Cellar"
+  export HOMEBREW_REPOSITORY="/opt/homebrew"
+  path=("/opt/homebrew/bin" "/opt/homebrew/sbin" $path)
+  fpath=("/opt/homebrew/share/zsh/site-functions" $fpath)
+elif [[ -x "/usr/local/bin/brew" ]]; then
+  eval "$(/usr/local/bin/brew shellenv)"
+fi
+
 # ================================
 # Powerlevel10k Instant Prompt
 # ================================
@@ -64,8 +82,18 @@ if [[ ! ${ZIM_HOME}/init.zsh -nt ${ZIM_CONFIG_FILE:-${ZDOTDIR:-${HOME}}/.zimrc} 
   source ${ZIM_HOME}/zimfw.zsh init
 fi
 
+# Register optional tool completion directories before Zim initializes compinit.
+[[ -d "$HOME/.grok/completions/zsh" ]] && fpath=("$HOME/.grok/completions/zsh" $fpath)
+[[ -d "$HOME/.bun" ]] && fpath=("$HOME/.bun" $fpath)
+
 # Initialize modules.
 source ${ZIM_HOME}/init.zsh
+
+# Claude Code copies interactive-shell options into its Bash tool snapshot, and zim's
+# environment module turns on NO_CLOBBER. Undo it only for Claude; your terminal keeps it.
+if [[ -n $CLAUDECODE ]]; then
+  unsetopt noclobber
+fi
 
 # ------------------------------
 # Post-init module configuration
@@ -81,16 +109,43 @@ for key ('j') bindkey -M vicmd ${key} history-substring-search-down
 unset key
 
 # ================================
-# Environment Variables
+# Environment Variables & PATH
 # ================================
 
-# Homebrew (Apple Silicon)
-if [[ -f "/opt/homebrew/bin/brew" ]]; then
-  eval "$(/opt/homebrew/bin/brew shellenv)"
+# GNU coreutils (prefer GNU tools when installed via Homebrew)
+[[ -d "/opt/homebrew/opt/coreutils/libexec/gnubin" ]] && path=("/opt/homebrew/opt/coreutils/libexec/gnubin" $path)
+
+# LLVM / Clang tooling
+if [[ -d "/opt/homebrew/opt/llvm" ]]; then
+  export LLVM_HOME="/opt/homebrew/opt/llvm"
+  [[ -d "$LLVM_HOME/bin" ]] && path=("$LLVM_HOME/bin" $path)
+  [[ -f "$LLVM_HOME/lib/libclang.dylib" ]] && export LIBCLANG_PATH="$LLVM_HOME/lib/libclang.dylib"
 fi
 
-# Local bin (for Claude CLI, etc.)
-export PATH="$HOME/.local/bin:$PATH"
+# Bun
+if [[ -d "$HOME/.bun" ]]; then
+  export BUN_INSTALL="$HOME/.bun"
+  path=("$BUN_INSTALL/bin" $path)
+fi
+
+# pnpm
+if [[ -d "$HOME/Library/pnpm" ]]; then
+  export PNPM_HOME="$HOME/Library/pnpm"
+  path=("$PNPM_HOME" "$PNPM_HOME/bin" $path)
+fi
+
+# Juliaup
+[[ -d "$HOME/.juliaup/bin" ]] && path=("$HOME/.juliaup/bin" $path)
+[[ -f "$HOME/.julia/juliaup/completions/zsh.zsh" ]] && source "$HOME/.julia/juliaup/completions/zsh.zsh"
+
+# CLI & AI Agent Bins (OpenCode, Grok, Antigravity IDE, DeepSeek Harness, ~/.local/bin)
+[[ -d "$HOME/.opencode/bin" ]] && path=("$HOME/.opencode/bin" $path)
+[[ -d "$HOME/.grok/bin" ]] && path=("$HOME/.grok/bin" $path)
+[[ -d "$HOME/.antigravity-ide/antigravity-ide/bin" ]] && path=("$HOME/.antigravity-ide/antigravity-ide/bin" $path)
+[[ -d "/Applications/DeepSeek Harness.app/Contents/Resources/runtime/cli/bin" ]] && \
+  path=("/Applications/DeepSeek Harness.app/Contents/Resources/runtime/cli/bin" $path)
+path=("$HOME/.local/bin" $path)
+export PATH
 
 # Default editor
 export EDITOR='nvim'
@@ -350,8 +405,9 @@ serve() {
   python3 -m http.server "$port"
 }
 
-# Docker container shell
-dsh() {
+# Docker container shell (renamed from dsh to dksh to avoid shadowing DeepSeek Harness CLI)
+unfunction dsh 2>/dev/null
+dksh() {
   local container
   container=$(docker ps --format "{{.Names}}" | fzf --prompt="Container> ")
   [[ -n "$container" ]] && docker exec -it "$container" sh -c "bash || sh"
@@ -367,6 +423,10 @@ ksh() {
 # ================================
 # Tool Integrations
 # ================================
+
+# Cache directory for generated tool init scripts (saves ~150ms startup time)
+_ZSH_CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/zsh"
+[[ -d "$_ZSH_CACHE_DIR" ]] || mkdir -p "$_ZSH_CACHE_DIR"
 
 # --- lazygit ---
 alias lg='lazygit'
@@ -396,8 +456,14 @@ function y() {
 [[ -f ~/.config/fzf-git.sh ]] && source ~/.config/fzf-git.sh
 
 # --- mise (version manager for Node, Python, Go, etc.) ---
-if command -v mise &> /dev/null; then
-  eval "$(mise activate zsh)"
+if (( $+commands[mise] )); then
+  [[ -d "$HOME/.local/share/mise/shims" ]] && path=("$HOME/.local/share/mise/shims" $path)
+  _mise_cache="$_ZSH_CACHE_DIR/mise-activate.zsh"
+  if [[ ! -f "$_mise_cache" || "${commands[mise]}" -nt "$_mise_cache" ]]; then
+    mise activate zsh | sed -e '/^export PATH=/d' -e '/^_mise_hook --force$/d' >| "$_mise_cache"
+  fi
+  source "$_mise_cache"
+  unset _mise_cache
 fi
 
 # --- tldr (simplified man pages) ---
@@ -495,15 +561,24 @@ review() {
 # Note: If using mise, you can remove nvm entirely
 export NVM_DIR="$HOME/.nvm"
 if [[ -d "$NVM_DIR" ]]; then
-  nvm() {
-    unset -f nvm node npm npx
-    [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-    [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
-    nvm "$@"
+  _load_nvm() {
+    (( $_nvm_loaded )) && return
+    _nvm_loaded=1
+    unset -f nvm node npm npx 2>/dev/null
+    [[ -s "$NVM_DIR/nvm.sh" ]] && \. "$NVM_DIR/nvm.sh"
+    [[ -s "$NVM_DIR/bash_completion" ]] && \. "$NVM_DIR/bash_completion"
   }
-  node() { nvm use default &>/dev/null; unset -f node; node "$@"; }
-  npm() { nvm use default &>/dev/null; unset -f npm; npm "$@"; }
-  npx() { nvm use default &>/dev/null; unset -f npx; npx "$@"; }
+  nvm()  { _load_nvm; nvm "$@"; }
+  node() { _load_nvm; node "$@"; }
+  npm()  { _load_nvm; npm "$@"; }
+  npx()  { _load_nvm; npx "$@"; }
+  # Expose default global npm bin (lark-cli, etc.) in PATH immediately using pure zsh glob
+  if [[ -r "$NVM_DIR/alias/default" ]]; then
+    _nvm_default_ver="$(<"$NVM_DIR/alias/default")"
+    _nvm_default_bins=("$NVM_DIR"/versions/node/v${_nvm_default_ver}*/bin(NOn))
+    (( ${#_nvm_default_bins} )) && path=("${_nvm_default_bins[1]}" $path)
+    unset _nvm_default_ver _nvm_default_bins
+  fi
 fi
 
 # ================================
@@ -511,18 +586,29 @@ fi
 # ================================
 
 # zoxide (must be at the end)
-if command -v zoxide &> /dev/null; then
-  eval "$(zoxide init zsh)"
+if (( $+commands[zoxide] )); then
+  _zoxide_cache="$_ZSH_CACHE_DIR/zoxide-init.zsh"
+  if [[ ! -f "$_zoxide_cache" || "${commands[zoxide]}" -nt "$_zoxide_cache" ]]; then
+    zoxide init zsh >| "$_zoxide_cache"
+  fi
+  source "$_zoxide_cache"
+  unset _zoxide_cache
 fi
+unset _ZSH_CACHE_DIR
 
 # Powerlevel10k configuration
 # To customize prompt, run `p10k configure` or edit ~/.p10k.zsh.
 [[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh
 
+# Otty shell integration (inert unless launched by Otty)
+if [[ -n "$ZSH_VERSION" && -n "$OTTY_SHELL_INTEGRATION" && -r "$OTTY_SHELL_INTEGRATION/otty-integration.zsh" ]]; then
+  . "$OTTY_SHELL_INTEGRATION/otty-integration.zsh"
+fi
+
 # ================================
 # Local Configuration (optional)
 # ================================
-# Source local config if exists (for machine-specific settings)
+# Source local config if exists (for machine-specific settings and secrets)
 [[ -f ~/.zshrc.local ]] && source ~/.zshrc.local
 
 # ================================
@@ -537,7 +623,7 @@ TIPS=(
   "💡 ll 详细列表 │ lt 树形显示 │ la 显示隐藏文件"
   "💡 Ctrl+G Ctrl+B 搜索分支 │ Ctrl+G Ctrl+H 搜索提交历史"
   "💡 bm add <名称> 添加书签 │ bm 选择书签 │ bm list 列出"
-  "💡 fssh 选择 SSH 连接 │ dsh 进入容器 │ ksh 进入 Pod"
+  "💡 fssh 选择 SSH 连接 │ dksh 进入容器 │ ksh 进入 Pod"
   "💡 ask \"问题\" 问 Claude │ gcm 生成 commit │ review 审查代码"
   "💡 notify <命令> 完成后通知 │ serve 8080 快速 HTTP 服务"
   "💡 fe 搜索编辑 │ fcd 搜索进入目录 │ fbr 切换分支 │ fkill 杀进程"
@@ -636,7 +722,7 @@ tips() {
 │ dim              │ docker images                                                │
 │ dex <name>       │ docker exec -it <name>                                       │
 │ dlogs <name>     │ docker logs -f <name>                                        │
-│ dsh              │ fzf 选择容器并进入 shell                                     │
+│ dksh             │ fzf 选择容器并进入 shell                                     │
 │ dprune           │ 清理所有未使用的资源                                         │
 └──────────────────┴──────────────────────────────────────────────────────────────┘
 
@@ -746,13 +832,12 @@ tips() {
 EOF
 }
 
-# Show system info and daily tip on terminal startup
-if [[ $- == *i* ]]; then
-  # Show fastfetch if available
-  if command -v fastfetch &> /dev/null; then
+# Show system info and daily tip only in direct interactive terminal sessions
+# (Skipped for `zsh -i -c ...` subshells, non-TTY pipes, and AI coding agents)
+if [[ -o interactive && -t 1 && -z $ZSH_EXECUTION_STRING && -z $CLAUDECODE && -z $CODEX_THREAD_ID && -z $ANTIGRAVITY_CLI_ALIAS ]]; then
+  if (( $+commands[fastfetch] )); then
     fastfetch --logo small
   fi
-  # Show random tip
   echo ""
   echo "${TIPS[$RANDOM % ${#TIPS[@]} + 1]}"
   echo "    输入 tips 查看完整快捷键列表"

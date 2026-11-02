@@ -37,6 +37,7 @@
 | [yazi](https://github.com/sxyazi/yazi) | 终端文件管理器 |
 | [tmux](https://github.com/tmux/tmux) | 终端复用器 |
 | [mise](https://github.com/jdx/mise) | 多语言版本管理 |
+| [fastfetch](https://github.com/fastfetch-cli/fastfetch) | 终端启动系统信息展示 |
 
 ## 快速安装
 
@@ -74,16 +75,17 @@ source ~/.zshrc
 | `Ctrl+G Ctrl+R` | 搜索远程仓库 |
 | `Ctrl+G Ctrl+S` | 搜索 Stash |
 
-### tmux 快捷键 (前缀键: Ctrl+A)
+### tmux 快捷键 (前缀键: Ctrl+B)
 
 | 快捷键 | 功能 |
 |--------|------|
-| `Ctrl+A \|` | 垂直分割窗口 |
-| `Ctrl+A -` | 水平分割窗口 |
-| `Ctrl+A h/j/k/l` | 在窗格间导航 |
-| `Ctrl+A g` | 打开 lazygit 弹窗 |
-| `Ctrl+A y` | 打开 yazi 弹窗 |
-| `Ctrl+A r` | 重新加载配置 |
+| `Ctrl+B \|` 或 `Ctrl+B %` | 垂直分割窗口 |
+| `Ctrl+B -` 或 `Ctrl+B "` | 水平分割窗口 |
+| `Ctrl+B h/j/k/l` | 在窗格间导航 |
+| `Ctrl+B g` | 打开 lazygit 弹窗 |
+| `Ctrl+B y` | 打开 yazi 弹窗 |
+| `Ctrl+B t` | 打开 htop 弹窗 |
+| `Ctrl+B r` | 重新加载配置 |
 
 ## 别名
 
@@ -196,8 +198,14 @@ fkill       # 选择并杀死进程
 ### 实用函数
 
 ```bash
+tips                  # 显示完整的终端快捷键与命令速查表
 mkcd dir              # 创建目录并进入
 extract file.tar.gz   # 自动解压各种格式
+bm add <name>         # 添加目录书签（bm 选择跳转 / bm list 列出 / bm rm 删除）
+fssh                  # fzf 选择 ~/.ssh/config 主机并连接
+dksh / ksh            # fzf 选择 Docker 容器 / K8s Pod 并进入 shell
+notify <cmd>          # 长耗时命令（>10s）完成后发送系统通知
+serve [port]          # 在当前目录快速启动 HTTP 服务（默认 8000）
 ```
 
 ## mise 版本管理

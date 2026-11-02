@@ -2,7 +2,7 @@
 #
 # Zsh Terminal Enhancement Setup Script
 # Author: shaoyiyang
-# Repository: https://github.com/shaoyiyang/dotfiles-zsh
+# Repository: https://github.com/ysyecust/dotfiles-zsh
 #
 # This script installs and configures:
 # - Zim (Zsh framework)
@@ -161,19 +161,6 @@ install_zim() {
     fi
 }
 
-# Install Powerlevel10k
-install_p10k() {
-    print_step "Checking Powerlevel10k..."
-
-    if [[ -d "${HOME}/.powerlevel10k" ]] || [[ -d "${HOME}/powerlevel10k" ]]; then
-        print_success "Powerlevel10k already installed"
-    else
-        print_step "Installing Powerlevel10k..."
-        git clone --depth=1 https://github.com/romkatv/powerlevel10k.git "${HOME}/.powerlevel10k"
-        print_success "Powerlevel10k installed"
-    fi
-}
-
 # Install configuration files
 install_configs() {
     print_step "Installing configuration files..."
@@ -198,24 +185,27 @@ install_configs() {
     cp "${SCRIPT_DIR}/config/fzf-git.sh" "${HOME}/.config/fzf-git.sh"
     print_success "Installed fzf-git.sh"
 
-    # Install .p10k.zsh if not exists or user wants to overwrite
+    # Install .p10k.zsh if not exists
     if [[ -f "${HOME}/.p10k.zsh" ]]; then
         print_warning ".p10k.zsh already exists. Run 'p10k configure' to reconfigure."
+    elif [[ -f "${SCRIPT_DIR}/config/.p10k.zsh" ]]; then
+        cp "${SCRIPT_DIR}/config/.p10k.zsh" "${HOME}/.p10k.zsh"
+        print_success "Installed .p10k.zsh"
     else
-        if [[ -f "${SCRIPT_DIR}/config/.p10k.zsh" ]]; then
-            cp "${SCRIPT_DIR}/config/.p10k.zsh" "${HOME}/.p10k.zsh"
-            print_success "Installed .p10k.zsh"
-        else
-            print_warning "No .p10k.zsh template found. Run 'p10k configure' after installation."
-        fi
+        print_warning "No .p10k.zsh template found. Run 'p10k configure' after installation."
     fi
 }
 
-# Compile Zim modules
+# Install and compile Zim modules (including Powerlevel10k, fzf-tab, etc.)
 compile_zim() {
-    print_step "Compiling Zim modules..."
-    zsh -c 'source ~/.zshrc && zimfw install' 2>/dev/null || true
-    print_success "Zim modules compiled"
+    print_step "Installing and compiling Zim modules..."
+    zsh -c '
+        ZIM_HOME=${ZDOTDIR:-${HOME}}/.zim
+        source "${ZIM_HOME}/zimfw.zsh" init -q
+        source "${ZIM_HOME}/zimfw.zsh" install
+        source "${ZIM_HOME}/zimfw.zsh" compile
+    ' 2>/dev/null || true
+    print_success "Zim modules installed and compiled"
 }
 
 # Print installation summary
@@ -238,14 +228,16 @@ print_summary() {
     echo "  • yazi (terminal file manager)"
     echo "  • tmux (terminal multiplexer)"
     echo "  • mise (version manager)"
+    echo "  • fastfetch (system info)"
     echo ""
     echo "Next steps:"
     echo "  1. Restart your terminal or run: source ~/.zshrc"
-    echo "  2. If p10k prompt appears, configure your theme"
+    echo "  2. Run 'tips' anytime to view the full terminal cheatsheet"
     echo "  3. Use 'z' command a few times to let zoxide learn your directories"
     echo "  4. Install Claude CLI for AI features: npm install -g @anthropic-ai/claude-code"
     echo ""
     echo "Quick reference:"
+    echo "  tips        - Show full cheatsheet"
     echo "  Ctrl+T      - Fuzzy file search"
     echo "  Ctrl+R      - Fuzzy history search"
     echo "  Alt+C       - Fuzzy directory jump"
@@ -270,7 +262,6 @@ main() {
 
     install_packages
     install_zim
-    install_p10k
     install_configs
     compile_zim
     print_summary

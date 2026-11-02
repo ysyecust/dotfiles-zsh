@@ -35,19 +35,20 @@ dotfiles-zsh/
 - **Flow**: OS detect → Package manager → Packages → Zim → Powerlevel10k → Configs → Compile
 - **Linux support**: apt (Debian/Ubuntu), dnf (Fedora/RHEL), pacman (Arch)
 
-### config/.zshrc (535 lines)
+### config/.zshrc
 - **Purpose**: Main shell configuration loaded at startup
 - **Sections**:
-  1. Powerlevel10k instant prompt (must be at top)
-  2. Zim framework initialization
-  3. Environment variables (PATH, EDITOR, HISTSIZE)
-  4. fzf configuration with Catppuccin Mocha theme
-  5. Aliases (eza, bat, git, Docker, Kubernetes)
-  6. Custom functions (mkcd, fe, fcd, fbr, fkill, extract, fssh, bm, notify, serve, dsh, ksh)
-  7. Tool integrations (lazygit, yazi, fzf-git, mise)
-  8. Claude CLI integration (ask, askf, gen, explain, fix, gcm, review)
-  9. Lazy loading (NVM)
-  10. Final initializations (zoxide, p10k, fastfetch)
+  1. Early PATH & static Homebrew setup (avoids `brew shellenv` fork overhead)
+  2. Powerlevel10k instant prompt
+  3. Zim framework initialization & optional completion `fpath` registration
+  4. Environment variables & conditional tool PATHs (coreutils, LLVM, Bun, pnpm, Juliaup, AI CLIs)
+  5. fzf configuration with Catppuccin Mocha theme
+  6. Aliases (eza, bat, git, Docker, Kubernetes)
+  7. Custom functions (mkcd, fe, fcd, fbr, fkill, extract, fssh, bm, notify, serve, dksh, ksh)
+  8. Tool integrations with cached init scripts (lazygit, yazi, fzf-git, mise)
+  9. Claude CLI integration (ask, askf, gen, explain, fix, gcm, review)
+  10. Lazy loading (NVM with pure-zsh default bin discovery)
+  11. Final initializations (cached zoxide, p10k, Otty, `~/.zshrc.local`, interactive-only fastfetch & tips)
 
 ### config/.zimrc
 - **Purpose**: Zim plugin manager module list

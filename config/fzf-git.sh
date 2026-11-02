@@ -80,8 +80,8 @@ if [[ $1 == --list ]]; then
         branches -a
         ;;
       hashes)
-        echo 'CTRL-O (open in browser) ╱ CTRL-D (diff)'
-        echo 'CTRL-S (toggle sort) ╱ ALT-F (list files) ╱ ALT-A (show all hashes)'
+        echo 'CTRL-O (open in browser) ╱ CTRL-D (diff) ╱ CTRL-S (toggle sort)'
+        echo 'ALT-R (toggle raw mode) ╱ ALT-F (list files) ╱ ALT-A (show all hashes)'
         hashes
         ;;
       all-hashes)
@@ -94,7 +94,7 @@ if [[ $1 == --list ]]; then
         refs --exclude='refs/remotes'
         ;;
       all-refs)
-        echo 'CTRL-O (open in browser) ╱ ALT-E (examine in editor)'
+        echo 'CTRL-O (open in browser) ╱ ALT-E (examine in editor) ╱ ALT-ENTER (accept without remote)'
         refs
         ;;
       *) exit 1 ;;
@@ -172,7 +172,7 @@ else
   # Redefine this function to change the options
   _fzf_git_fzf() {
     fzf --height 50% --tmux 90%,70% \
-      --layout reverse --multi --min-height 20+ --border \
+      --layout reverse --multi --min-height 20+ \
       --no-separator --header-border horizontal \
       --border-label-pos 2 \
       --color 'label:blue' \
@@ -192,8 +192,24 @@ __fzf_git=${BASH_SOURCE[0]:-${(%):-%x}}
 __fzf_git=$(readlink -f "$__fzf_git" 2> /dev/null || /usr/bin/ruby --disable-gems -e 'puts File.expand_path(ARGV.first)' "$__fzf_git" 2> /dev/null)
 
 _fzf_git_files() {
-  _fzf_git_check || return
   local root query extract_file_name
+
+  # Outside a git repository, fall back to the file search of fzf.
+  # --force-tty-in is required when the caller has no tty on its standard
+  # input, which is the case for the tmux bindings.
+  if ! git rev-parse > /dev/null 2>&1; then
+    root=$PWD
+    if [[ -n $HOME ]] && [[ $root == "$HOME" || $root == "$HOME"/* ]]; then
+      root="~${root#"$HOME"}"
+    fi
+    _fzf_git_fzf -m --force-tty-in \
+      --border-label "📁 Files in $root " \
+      --header 'ALT-E (open in editor)' \
+      --bind "alt-e:execute:${EDITOR:-vim} {}" \
+      --preview "$(__fzf_git_cat) {}" "$@"
+    return
+  fi
+
   root=$(git rev-parse --show-toplevel)
   [[ -n "$(git rev-parse --show-prefix)" ]] && query='!../ '
 
@@ -222,10 +238,12 @@ EOF
 _fzf_git_tree_files() {
   _fzf_git_check || return
 
-  local treeish
+  local treeish cdup prefix
+  cdup="$(git rev-parse --show-cdup)"
+  prefix="$(git rev-parse --show-prefix)"
   for treeish in "$@"; do
-    git diff-tree --no-commit-id --name-only "$treeish" -r
-  done | sort -u |
+    git diff-tree --root --no-commit-id --name-only --line-prefix="$cdup" "$treeish" -r
+  done | sort -u | sed "s|^$cdup$prefix||" |
     _fzf_git_fzf -m \
       --border-label "📂 Files in $* " \
       --header 'CTRL-O (open in browser) ╱ ALT-E (open in editor)' \
@@ -264,13 +282,14 @@ _fzf_git_tags() {
     --border-label '📛 Tags ' \
     --header 'CTRL-O (open in browser)' \
     --bind "ctrl-o:execute-silent:bash \"$__fzf_git\" --list tag {}" \
+    --bind 'alt-r:toggle-raw' \
     --preview "git show --color=$(__fzf_git_color .) {} | $(__fzf_git_pager)" "$@"
 }
 
 _fzf_git_hashes() {
   _fzf_git_check || return
   bash "$__fzf_git" --list hashes |
-  _fzf_git_fzf --ansi --no-sort --bind 'ctrl-s:toggle-sort' \
+  _fzf_git_fzf --ansi --no-sort --bind 'ctrl-s:toggle-sort,alt-r:toggle-raw' \
     --border-label '🍡 Hashes ' \
     --header-lines 2 \
     --bind "ctrl-o:execute-silent:bash \"$__fzf_git\" --list commit {}" \
@@ -324,6 +343,7 @@ _fzf_git_lreflogs() {
   _fzf_git_check || return
   git reflog --color=$(__fzf_git_color) --format="%C(blue)%gD %C(yellow)%h%C(auto)%d %gs" | _fzf_git_fzf --ansi \
     --border-label '📒 Reflogs ' \
+    --bind 'alt-r:toggle-raw' \
     --preview "git show --color=$(__fzf_git_color .) {1} | $(__fzf_git_pager)" "$@" |
   awk '{print $1}'
 }
@@ -342,8 +362,10 @@ _fzf_git_each_ref() {
     --bind "ctrl-o:execute-silent:bash \"$__fzf_git\" --list {1} {2}" \
     --bind "alt-e:execute:${EDITOR:-vim} <(git show {2}) < /dev/tty > /dev/tty" \
     --bind "alt-a:change-border-label(🍀 Every ref)+reload:bash \"$__fzf_git\" --list all-refs" \
-    --preview "git log --oneline --graph --date=short --color=$(__fzf_git_color .) --pretty='format:%C(auto)%cd %h%d %s' {2} --" "$@" |
-  awk '{print $2}'
+    --bind "alt-enter:become:printf '%s\n' {+2} | sed 's@[^/]*/@@'" \
+    --preview "git log --oneline --graph --date=short --color=$(__fzf_git_color .) --pretty='format:%C(auto)%cd %h%d %s' {2} --" \
+    --accept-nth 2 \
+    "$@"
 }
 
 _fzf_git_worktrees() {
