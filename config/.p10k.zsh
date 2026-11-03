@@ -171,7 +171,7 @@
   # If directory is too long, shorten some of its segments to the shortest possible unique
   # prefix. The shortened directory can be tab-completed to the original.
   # Options: truncate_to_unique, truncate_from_right, truncate_to_last, none
-  typeset -g POWERLEVEL9K_SHORTEN_STRATEGY=none
+  typeset -g POWERLEVEL9K_SHORTEN_STRATEGY=
   # Replace removed segment suffixes with this symbol.
   typeset -g POWERLEVEL9K_SHORTEN_DELIMITER=
   # Color of the shortened directory segments.
@@ -220,7 +220,7 @@
   # respectively.
   typeset -g POWERLEVEL9K_DIR_TRUNCATE_BEFORE_MARKER=false
   # Don't shorten this many last directory segments. They are anchors.
-  typeset -g POWERLEVEL9K_SHORTEN_DIR_LENGTH=1
+  typeset -g POWERLEVEL9K_SHORTEN_DIR_LENGTH=
   # Shorten directory if it's longer than this even if there is space for it. The value can
   # be either absolute (e.g., '80') or a percentage of terminal width (e.g, '50%'). If empty,
   # directory will be shortened only when prompt doesn't fit or when other parameters demand it
