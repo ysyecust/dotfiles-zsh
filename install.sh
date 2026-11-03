@@ -234,7 +234,6 @@ print_summary() {
     echo "  1. Restart your terminal or run: source ~/.zshrc"
     echo "  2. Run 'tips' anytime to view the full terminal cheatsheet"
     echo "  3. Use 'z' command a few times to let zoxide learn your directories"
-    echo "  4. Install Claude CLI for AI features: npm install -g @anthropic-ai/claude-code"
     echo ""
     echo "Quick reference:"
     echo "  tips        - Show full cheatsheet"
@@ -246,8 +245,6 @@ print_summary() {
     echo "  lg          - Lazygit"
     echo "  y           - Yazi file manager"
     echo "  tmux        - Terminal multiplexer"
-    echo "  ask \"...\"   - Ask Claude (headless mode)"
-    echo "  gcm         - Generate git commit message with Claude"
     echo ""
 }
 

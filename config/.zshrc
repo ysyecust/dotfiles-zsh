@@ -89,12 +89,6 @@ fi
 # Initialize modules.
 source ${ZIM_HOME}/init.zsh
 
-# Claude Code copies interactive-shell options into its Bash tool snapshot, and zim's
-# environment module turns on NO_CLOBBER. Undo it only for Claude; your terminal keeps it.
-if [[ -n $CLAUDECODE ]]; then
-  unsetopt noclobber
-fi
-
 # ------------------------------
 # Post-init module configuration
 # ------------------------------
@@ -470,90 +464,6 @@ fi
 alias help='tldr'
 
 # ================================
-# Claude CLI Integration
-# ================================
-
-# Claude Code headless mode helpers
-# Usage: ask "your question here"
-ask() {
-  if [[ -z "$1" ]]; then
-    echo "Usage: ask \"your question\""
-    return 1
-  fi
-  claude -p "$*"
-}
-
-# Ask Claude with file context
-# Usage: askf file.py "explain this code"
-askf() {
-  if [[ -z "$1" || -z "$2" ]]; then
-    echo "Usage: askf <file> \"your question\""
-    return 1
-  fi
-  local file="$1"
-  shift
-  cat "$file" | claude -p "$*"
-}
-
-# Ask Claude to generate code
-# Usage: gen "create a python script that..."
-gen() {
-  if [[ -z "$1" ]]; then
-    echo "Usage: gen \"description of what to generate\""
-    return 1
-  fi
-  claude -p "Generate code: $*"
-}
-
-# Ask Claude to explain a command
-# Usage: explain "ls -la"
-explain() {
-  if [[ -z "$1" ]]; then
-    echo "Usage: explain \"command\""
-    return 1
-  fi
-  claude -p "Explain this shell command in detail: $*"
-}
-
-# Ask Claude to fix an error
-# Usage: fix "error message"
-fix() {
-  if [[ -z "$1" ]]; then
-    echo "Usage: fix \"error message\""
-    return 1
-  fi
-  claude -p "How do I fix this error: $*"
-}
-
-# Pipe command output to Claude for analysis
-# Usage: some_command | ask-pipe "analyze this output"
-ask-pipe() {
-  local prompt="${1:-Analyze this output}"
-  claude -p "$prompt"
-}
-
-# Git commit message generator
-# Usage: gcm (generates commit message based on staged changes)
-gcm() {
-  local diff=$(git diff --cached)
-  if [[ -z "$diff" ]]; then
-    echo "No staged changes found. Use 'git add' first."
-    return 1
-  fi
-  echo "$diff" | claude -p "Generate a concise git commit message for these changes. Output only the commit message, nothing else."
-}
-
-# Code review helper
-# Usage: review file.py
-review() {
-  if [[ -z "$1" ]]; then
-    echo "Usage: review <file>"
-    return 1
-  fi
-  cat "$1" | claude -p "Review this code. Point out potential bugs, security issues, and suggest improvements."
-}
-
-# ================================
 # Lazy Loading (for faster startup)
 # ================================
 
@@ -624,13 +534,11 @@ TIPS=(
   "💡 Ctrl+G Ctrl+B 搜索分支 │ Ctrl+G Ctrl+H 搜索提交历史"
   "💡 bm add <名称> 添加书签 │ bm 选择书签 │ bm list 列出"
   "💡 fssh 选择 SSH 连接 │ dksh 进入容器 │ ksh 进入 Pod"
-  "💡 ask \"问题\" 问 Claude │ gcm 生成 commit │ review 审查代码"
   "💡 notify <命令> 完成后通知 │ serve 8080 快速 HTTP 服务"
   "💡 fe 搜索编辑 │ fcd 搜索进入目录 │ fbr 切换分支 │ fkill 杀进程"
   "💡 d/dc Docker │ k Kubectl │ dps/kgp 查看状态"
   "💡 cat 语法高亮 │ ../... 返回上级 │ mkcd 创建并进入"
   "💡 tmux: Ctrl+B | 垂直分割 │ Ctrl+B - 水平 │ Ctrl+B g lazygit"
-  "💡 gen \"描述\" 生成代码 │ explain \"命令\" 解释 │ fix \"错误\" 修复"
   "💡 ↑/↓ 历史子串搜索 │ → 接受自动建议 │ Ctrl+/ 切换预览"
 )
 
@@ -743,19 +651,6 @@ tips() {
 └──────────────────┴──────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────────────────────┐
-│ 🤖 Claude AI 集成                                                               │
-├──────────────────┬──────────────────────────────────────────────────────────────┤
-│ ask "问题"       │ 直接向 Claude 提问                                           │
-│ askf file "问题" │ 带文件上下文提问                                             │
-│ gen "描述"       │ 让 Claude 生成代码                                           │
-│ explain "命令"   │ 解释 Shell 命令                                              │
-│ fix "错误信息"   │ 让 Claude 帮助修复错误                                       │
-│ review <file>    │ 代码审查                                                     │
-│ gcm              │ 根据 staged 更改生成 commit message                          │
-│ cmd | ask-pipe   │ 管道输出给 Claude 分析                                       │
-└──────────────────┴──────────────────────────────────────────────────────────────┘
-
-┌─────────────────────────────────────────────────────────────────────────────────┐
 │ ⌨️  Tmux 快捷键 (前缀: Ctrl+B)                                                   │
 ├──────────────────┬──────────────────────────────────────────────────────────────┤
 │ |                │ 垂直分割窗口                                                 │
@@ -834,7 +729,7 @@ EOF
 
 # Show system info and daily tip only in direct interactive terminal sessions
 # (Skipped for `zsh -i -c ...` subshells, non-TTY pipes, and AI coding agents)
-if [[ -o interactive && -t 1 && -z $ZSH_EXECUTION_STRING && -z $CLAUDECODE && -z $CODEX_THREAD_ID && -z $ANTIGRAVITY_CLI_ALIAS ]]; then
+if [[ -o interactive && -t 1 && -z $ZSH_EXECUTION_STRING && -z $CODEX_THREAD_ID && -z $ANTIGRAVITY_CLI_ALIAS ]]; then
   if (( $+commands[fastfetch] )); then
     fastfetch --logo small
   fi

@@ -17,7 +17,6 @@
 - **文件管理** - yazi 现代终端文件管理器
 - **终端复用** - tmux 多窗口、会话管理
 - **版本管理** - mise 统一管理 Node/Python/Go 版本
-- **AI 集成** - Claude CLI 无头模式快捷命令
 
 ## 安装的组件
 
@@ -138,42 +137,6 @@ gla     # git log --all --graph
 reload  # 重新加载 .zshrc
 path    # 显示 PATH（每行一个）
 ports   # 显示监听的端口
-```
-
-## Claude CLI 集成
-
-需要先安装 Claude CLI：
-```bash
-npm install -g @anthropic-ai/claude-code
-```
-
-### 快捷命令
-
-```bash
-# 直接问问题
-ask "how to reverse a string in python"
-
-# 带文件上下文提问
-askf main.py "explain this code"
-
-# 生成代码
-gen "create a python script that downloads images from a URL"
-
-# 解释命令
-explain "find . -name '*.py' -exec grep -l 'import os' {} +"
-
-# 修复错误
-fix "ModuleNotFoundError: No module named 'requests'"
-
-# 管道分析
-cat error.log | ask-pipe "analyze these errors"
-
-# 生成 Git 提交信息
-git add .
-gcm   # 自动分析 staged 更改并生成提交信息
-
-# 代码审查
-review main.py
 ```
 
 ## 自定义函数
